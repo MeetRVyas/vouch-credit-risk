@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python-lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package (api + ml + dev extras)
+        run: pip install ".[api,ml,dev]"
+
+      - name: Lint
+        run: ruff check src/ tests/ scripts/
+
+      - name: Train the local demo model
+        # CI-only, synthetic-data model so the smoke tests (and the docker
+        # build check below) have a real artifact to load. NOT what gets
+        # deployed to HF Spaces.
+        run: python scripts/train_local_demo.py
+
+      - name: Test (model loads, /predict returns a valid schema/probability range)
+        run: pytest -q
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npx oxlint src/
+      - run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [python-lint-test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Produce a model artifact for the build context
+        run: |
+          pip install ".[ml]"
+          python scripts/train_local_demo.py
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build API image (check only, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/Dockerfile.api
+          push: false
+          tags: credit-risk-api:ci
+
+  deploy-hf-spaces:
+    runs-on: ubuntu-latest
+    needs: [python-lint-test, frontend-build, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require a real trained model artifact
+        # The demo model above is synthetic-data-only and exists purely for
+        # CI. Deploying it to a "live" endpoint would be misleading, so this
+        # job refuses to proceed until the real artifact (trained on Kaggle,
+        # see notebooks/) has been committed.
+        run: |
+          if [ ! -f artifacts/model/model.json ] || [ ! -f artifacts/model/metadata.json ]; then
+            echo "::error::artifacts/model/{model.json,metadata.json} are not committed."
+            echo "::error::Train on Kaggle first, then: git add -f artifacts/model/model.json artifacts/model/metadata.json"
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Stage the Space deploy directory
+        # HF Spaces (Docker SDK) expects a Dockerfile at the repo root and a
+        # README.md with a YAML config block -- both different from this
+        # monorepo's root, so we stage a minimal directory that *is* shaped
+        # like a Space repo rather than pushing the whole monorepo.
+        run: |
+          mkdir -p deploy_staging
+          cp infra/Dockerfile.api deploy_staging/Dockerfile
+          cp pyproject.toml deploy_staging/
+          cp -r src deploy_staging/src
+          cp -r sql deploy_staging/sql
+          cp -r artifacts deploy_staging/artifacts
+          cat > deploy_staging/README.md <<'EOF'
+          ---
+          title: Credit Default Risk API
+          emoji: 📒
+          colorFrom: gray
+          colorTo: green
+          sdk: docker
+          app_port: 8000
+          ---
+
+          Probability-of-default scoring API for loan applications (Home Credit
+          Default Risk dataset). `POST /predict`, `GET /health`. Source + full
+          project (notebook, frontend, infra): see the linked GitHub repository.
+          EOF
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+        run: |
+          pip install huggingface_hub
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          space_id = os.environ.get("HF_SPACE_ID")
+          if not space_id:
+              raise SystemExit(
+                  "HF_SPACE_ID repo variable is not set (Settings > Secrets and "
+                  "variables > Actions > Variables). Expected form: "
+                  "'<hf-username>/<space-name>'."
+              )
+
+          HfApi(token=os.environ["HF_TOKEN"]).upload_folder(
+              folder_path="deploy_staging",
+              repo_id=space_id,
+              repo_type="space",
+              commit_message=f"Deploy {os.environ.get('GITHUB_SHA', '')[:7]}",
+          )
+          PY

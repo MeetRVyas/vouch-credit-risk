@@ -1,0 +1,46 @@
+# Local dev stack: the API + the Postgres it logs predictions to.
+# This is a DIFFERENT Postgres than MLflow's tracking-store DB
+# (see infra/mlflow-server/) -- different lifecycle, different consumer.
+#
+# From repo root:
+#   docker compose -f infra/docker-compose.yml up --build
+#
+# The API needs a trained model artifact at artifacts/model/ before it will
+# start serving -- run `python scripts/train_local_demo.py` first for a
+# quick local demo model, or point MODEL_ARTIFACT_DIR at a real training
+# run's output.
+
+services:
+  prediction-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: credit_risk
+    ports:
+      - "5432:5432"
+    volumes:
+      - prediction_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@prediction-db:5432/credit_risk
+      LOG_PREDICTIONS: "true"
+      MODEL_ARTIFACT_DIR: /app/artifacts/model
+      CORS_ALLOW_ORIGINS: '["http://localhost:5173"]'
+    depends_on:
+      prediction-db:
+        condition: service_healthy
+
+volumes:
+  prediction_db_data:

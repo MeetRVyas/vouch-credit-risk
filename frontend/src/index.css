@@ -1,0 +1,107 @@
+/* ---------------------------------------------------------------------
+   Design tokens: "credit ledger" identity.
+
+   Grounded in the subject itself: bookkeeping's oldest convention is
+   black ink for a balance, red ink for a deficit ("in the red" /
+   "in the black") -- that's the literal source for the risk-band colors
+   below, not an arbitrary traffic-light palette. Paper is cool-toned
+   (not the warm cream+terracotta AI-default), ruled lines are structural
+   (this is a form you fill in, like a ledger line), and the signature
+   element is a wax/rubber "assessment stamp", not a generic gauge widget.
+------------------------------------------------------------------------ */
+
+:root {
+  /* palette */
+  --paper: #f0f1ea;
+  --paper-raised: #f7f8f2;
+  --rule: #cdd0c2;
+  --rule-strong: #aeb29d;
+  --ink: #1c2624;
+  --ink-soft: #55625d;
+  --ink-faint: #8b9690;
+
+  --brass: #a6742c;
+  --brass-deep: #7c551e;
+  --brass-soft: #e4d3ae;
+
+  --risk-low: #2f6f4e;
+  --risk-low-soft: #dce9e0;
+  --risk-medium: #a6742c;
+  --risk-medium-soft: #efe3c8;
+  --risk-high: #8c3b33;
+  --risk-high-soft: #ecdad7;
+
+  /* type */
+  --font-display: "Spectral", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
+  /* layout */
+  --content-width: 76rem;
+  --radius: 3px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 0 1.5rem 4rem;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* numeric/tabular figures always get the mono face with tabular numerals --
+   this is a form about arithmetic, and figures should line up like a ledger's */
+.figure,
+input[type="number"],
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--brass-deep);
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass-deep);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

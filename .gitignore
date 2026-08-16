@@ -205,6 +205,7 @@ tempCodeRunnerFile.py
 
 # Ruff stuff:
 .ruff_cache/
+*.egg-info/
 
 # PyPI configuration file
 .pypirc
@@ -216,3 +217,34 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Virtual Environment
+.venv/
+venv/
+
+# env / secrets
+.env
+infra/mlflow-server/.env
+
+# Kaggle competition data
+data/raw/
+*.csv.zip
+application_train.csv
+application_test.csv
+bureau.csv
+bureau_balance.csv
+
+# trained model artifacts
+artifacts/model/*.json
+artifacts/model/*.png
+
+# MLflow local runs
+mlruns/
+mlartifacts/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store

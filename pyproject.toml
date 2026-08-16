@@ -1,0 +1,77 @@
+[project]
+name = "credit-risk"
+version = "0.1.0"
+description = "Probability-of-default model on Home Credit Default Risk data, served via FastAPI."
+requires-python = ">=3.11"
+readme = "README.md"
+
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+]
+
+[project.optional-dependencies]
+# Notebook / offline training pipeline (run on Kaggle, or locally against the sample data).
+ml = [
+    "duckdb>=1.0",
+    "polars>=1.0",
+    "xgboost>=2.1",
+    "scikit-learn>=1.5",
+    "optuna>=3.6",
+    "mlflow>=2.14",
+    "shap>=0.45",
+    "matplotlib>=3.8",
+]
+
+# What the served API actually imports at runtime: feature engineering
+# (polars), the model + explainer (xgboost, shap, matplotlib), scoring
+# (scikit-learn transitively via shap). No duckdb/optuna/mlflow -- those are
+# training-time-only and would just bloat the serving image.
+serving-ml = [
+    "polars>=1.0",
+    "xgboost>=2.1",
+    "shap>=0.45",
+    "matplotlib>=3.8",
+]
+
+# Serving layer.
+api = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.29",
+    "python-multipart>=0.0.9",
+]
+
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "ruff>=0.5",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# one-off notebook-content generator: long embedded markdown/prose strings
+# are expected here, not a line-length problem in real code.
+"scripts/build_notebook.py" = ["E501"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
