@@ -17,6 +17,7 @@ import duckdb
 import polars as pl
 
 from credit_risk.data.leakage_checks import assert_no_future_dated_bureau_rows
+from credit_risk.features.engineering import ID_AND_TARGET_COLUMNS, RAW_APPLICATION_FEATURE_COLUMNS
 
 _SQL_PATH = Path(__file__).resolve().parents[3] / "sql" / "bureau_aggregation.sql"
 
@@ -53,7 +54,8 @@ def load_and_join(application_path: str, bureau_path: str, *, verify_leakage: bo
 
     bureau_agg = con.execute(_load_aggregation_sql()).pl()
 
-    application = con.execute("select * from application_train").pl()
+    application_select_cols = ", ".join(ID_AND_TARGET_COLUMNS + RAW_APPLICATION_FEATURE_COLUMNS)
+    application = con.execute(f"select {application_select_cols} from application_train").pl()
     con.close()
 
     joined = application.join(bureau_agg, on="SK_ID_CURR", how="left")

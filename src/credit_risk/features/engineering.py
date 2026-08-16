@@ -26,6 +26,26 @@ CATEGORICAL_COLUMNS = [
     "NAME_HOUSING_TYPE",
 ]
 
+# The deliberate, curated subset of application_train's ~122 real columns
+# this project models -- NOT `select *`. Two reasons this is a hard list,
+# not "whatever's in the file":
+#   1. It must exactly match what the served API can ever populate (see
+#      credit_risk.api.services.prediction_service._request_to_raw_frame).
+#      Training on columns the API can't supply would silently train a
+#      model that scores every request with those features zeroed out.
+#   2. The real file's other ~100 columns include several more free-text
+#      categoricals (OCCUPATION_TYPE, ORGANIZATION_TYPE, ...) that
+#      `encode_categoricals` doesn't know about -- pulling them in via
+#      `select *` crashes XGBoost's `.fit()` on an unhandled object dtype.
+RAW_APPLICATION_FEATURE_COLUMNS = [
+    "NAME_CONTRACT_TYPE", "CODE_GENDER", "FLAG_OWN_CAR", "FLAG_OWN_REALTY",
+    "CNT_CHILDREN", "AMT_INCOME_TOTAL", "AMT_CREDIT", "AMT_ANNUITY",
+    "AMT_GOODS_PRICE", "NAME_INCOME_TYPE", "NAME_EDUCATION_TYPE",
+    "NAME_FAMILY_STATUS", "NAME_HOUSING_TYPE", "DAYS_BIRTH", "DAYS_EMPLOYED",
+    "CNT_FAM_MEMBERS", "REGION_RATING_CLIENT", "EXT_SOURCE_1",
+    "EXT_SOURCE_2", "EXT_SOURCE_3",
+]
+
 ID_AND_TARGET_COLUMNS = ["SK_ID_CURR", "TARGET"]
 
 
@@ -70,7 +90,20 @@ def encode_categoricals(df: pl.DataFrame) -> pl.DataFrame:
 
 def build_feature_frame(df: pl.DataFrame) -> pl.DataFrame:
     """Full feature-engineering pipeline: clean -> ratios -> encode."""
-    return encode_categoricals(add_ratio_features(clean(df)))
+    out = encode_categoricals(add_ratio_features(clean(df)))
+
+    non_numeric = [
+        c for c, dt in zip(out.columns, out.dtypes, strict=True)
+        if c not in ID_AND_TARGET_COLUMNS and dt in (pl.Utf8, pl.Categorical, pl.Object)
+    ]
+    if non_numeric:
+        raise ValueError(
+            f"build_feature_frame produced non-numeric column(s) {non_numeric} -- "
+            "add them to CATEGORICAL_COLUMNS (to one-hot encode) or "
+            "RAW_APPLICATION_FEATURE_COLUMNS (to exclude them from the raw select) "
+            "in this module."
+        )
+    return out
 
 
 def get_feature_columns(df: pl.DataFrame) -> list[str]:
