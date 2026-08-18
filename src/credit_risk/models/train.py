@@ -11,20 +11,19 @@ either way, per the spec.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 
-import os
 import numpy as np
 import optuna
 import polars as pl
 import xgboost as xgb
-from sklearn.model_selection import StratifiedKFold
-
 from dotenv import load_dotenv
-load_dotenv()
+from sklearn.model_selection import StratifiedKFold
 
 from credit_risk.evaluation.metrics import compute_classification_metrics
 
+load_dotenv()
 
 DEVICE = os.environ.get("DEVICE", "cpu")
 
