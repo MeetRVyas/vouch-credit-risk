@@ -238,6 +238,9 @@ bureau_balance.csv
 artifacts/model/*.json
 artifacts/model/*.png
 
+# Sample data
+data/sample/
+
 # MLflow local runs
 mlruns/
 mlartifacts/
